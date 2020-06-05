@@ -44,6 +44,9 @@ By reducing the communication complexity to O(N), a scalable BFT-based consensus
 - [ ] Unit test
 - [ ] Peer reviewed by Kevin
 - [ ] Run and pressure test
+- [ ] Consensus engine APIs
+- [ ] VRF committee-picker
+- [ ] Others
 
 
 ## Contribution
