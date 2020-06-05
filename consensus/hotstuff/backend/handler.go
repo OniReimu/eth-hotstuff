@@ -132,5 +132,11 @@ func (h *backend) SetBroadcaster(broadcaster consensus.Broadcaster) {
 }
 
 func (h *backend) NewChainHead() error {
+	h.coreMu.RLock()
+	defer h.coreMu.RUnlock()
+	if !h.coreStarted {
+		return hotstuff.ErrStoppedEngine
+	}
+	go h.hotStuffEventMux.Post(hotstuff.FinalCommittedEvent{})
 	return nil
 }

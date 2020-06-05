@@ -12,7 +12,7 @@ Key enhancements over go-ethereum:
 
 * __Higher Performance__ - Eth-hotstuff offers significantly higher performance throughput than public geth.
 * [__Scalability__](https://arxiv.org/abs/1803.05069) - Eth-hotstuff offers the most scalable BFT-based consensus mechanism to support hundreds and thousands of validators in a network at the same time while remaining high throughput.
-* __Alternative committee-picker__ - Eth-hotstuff offers multiple committee-picker rather than the simple round-robin scheme.
+* __Alternative committee-picker__ - Eth-hotstuff offers multiple committee-pickers rather than the simple round-robin scheme.
 	* __Round-Robin__
 	* __Sticky__
 	* __VRF__
@@ -37,6 +37,14 @@ This implies that an unconfirmation window (used in PoW) will be implemented eve
 * __Alternative committee-picker__ - Turns out that the HotStuff is independent to the committee-picker. 
 
 By reducing the communication complexity to O(N), a scalable BFT-based consensus mechanism can be achieved in large-scale networks.
+
+## TODO
+
+- [x] Coding
+- [ ] Unit test
+- [ ] Peer reviewed by Kevin
+- [ ] Run and pressure test
+
 
 ## Contribution
 

@@ -190,7 +190,6 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		isLocalBlock:       isLocalBlock,
 		localUncles:        make(map[common.Hash]*types.Block),
 		remoteUncles:       make(map[common.Hash]*types.Block),
-		unconfirmed:        newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
 		pendingTasks:       make(map[common.Hash]*task),
 		txsCh:              make(chan core.NewTxsEvent, txChanSize),
 		chainHeadCh:        make(chan core.ChainHeadEvent, chainHeadChanSize),
@@ -215,6 +214,14 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		log.Warn("Sanitizing miner recommit interval", "provided", recommit, "updated", minRecommitInterval)
 		recommit = minRecommitInterval
 	}
+
+	// BLS-Upgrade
+	if _, ok := worker.engine.(consensus.HotStuff); ok {
+		worker.unconfirmed = newUnconfirmedBlocks(eth.BlockChain(), 3)
+	} else {
+		worker.unconfirmed = newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth)
+	}
+	// /BLS-Upgrade
 
 	go worker.mainLoop()
 	go worker.newWorkLoop(recommit)
@@ -360,6 +367,9 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			commit(false, commitInterruptNewHead)
 
 		case head := <-w.chainHeadCh:
+			if h, ok := w.engine.(consensus.Handler); ok {
+				h.NewChainHead()
+			}
 			clearPending(head.Block.NumberU64())
 			timestamp = time.Now().Unix()
 			commit(false, commitInterruptNewHead)

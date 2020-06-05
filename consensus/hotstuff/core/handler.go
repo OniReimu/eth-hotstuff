@@ -59,6 +59,9 @@ func (c *core) subscribeEvents() {
 	c.timeoutSub = c.backend.EventMux().Subscribe(
 		timeoutEvent{},
 	)
+	c.finalCommittedSub = c.backend.EventMux().Subscribe(
+		hotstuff.FinalCommittedEvent{},
+	)
 }
 
 // Unsubscribe all events
@@ -69,6 +72,9 @@ func (c *core) unsubscribeEvents() {
 	}
 	if c.timeoutSub != nil {
 		c.timeoutSub.Unsubscribe()
+	}
+	if c.finalCommittedSub != nil {
+		c.finalCommittedSub.Unsubscribe()
 	}
 }
 
@@ -119,14 +125,14 @@ func (c *core) handleEvents() {
 				return
 			}
 			c.handleTimeoutMsg()
-			// case event, ok := <-c.finalCommittedSub.Chan():
-			// 	if !ok {
-			// 		return
-			// 	}
-			// 	switch event.Data.(type) {
-			// 	case istanbul.FinalCommittedEvent:
-			// 		c.handleFinalCommitted()
-			// 	}
+		case event, ok := <-c.finalCommittedSub.Chan():
+			if !ok {
+				return
+			}
+			switch event.Data.(type) {
+			case hotstuff.FinalCommittedEvent:
+				c.handleFinalCommitted()
+			}
 		}
 	}
 }

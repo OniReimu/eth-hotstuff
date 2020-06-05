@@ -14,30 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package hotstuff
+package core
 
-// import (
-// 	"github.com/ethereum/go-ethereum/common"
-// )
+import "github.com/ethereum/go-ethereum/common"
 
-// RequestEvent is posted to propose a proposal (posting the incoming block to
-// the main hotstuff engine anyway regardless of being the speaker or delegators)
-type RequestEvent struct {
-	Proposal Proposal
-}
-
-// MessageEvent is posted for HotStuff engine communication (postng the incoming
-// communication messages to the main hotstuff engine anyway)
-type MessageEvent struct {
-	Payload []byte
-}
-
-// SendingPubEvent is posted for HotStuff engine communication (postng the incoming
-// communication messages to the main hotstuff engine anyway to broadcast the pub)
-type SendingPubEvent struct {
-	Payload []byte
-}
-
-// FinalCommittedEvent is posted when a proposal is committed
-type FinalCommittedEvent struct {
+func (c *core) handleFinalCommitted() error {
+	logger := c.logger.New("state", c.state)
+	logger.Trace("Received a final committed proposal")
+	c.startNewRound(common.Big0)
+	return nil
 }

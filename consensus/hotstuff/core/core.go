@@ -69,9 +69,9 @@ type core struct {
 	state   State
 	logger  log.Logger
 
-	backend hotstuff.Backend
-	events  *event.TypeMuxSubscription
-	// finalCommittedSub *event.TypeMuxSubscription
+	backend             hotstuff.Backend
+	events              *event.TypeMuxSubscription
+	finalCommittedSub   *event.TypeMuxSubscription
 	timeoutSub          *event.TypeMuxSubscription
 	futureAnnounceTimer *time.Timer
 
