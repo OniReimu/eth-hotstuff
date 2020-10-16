@@ -274,7 +274,7 @@ func CreateConsensusEngine(ctx *node.ServiceContext, chainConfig *params.ChainCo
 		config.HotStuff.BlockPeriod = chainConfig.HotStuff.Period
 		config.HotStuff.Suite = chainConfig.HotStuff.Suite
 		config.HotStuff.SpeakerPolicy = hotstuff.SpeakerPolicy(chainConfig.HotStuff.SpeakerPolicy)
-		return hotStuffBackend.New(&config.HotStuff, db)
+		return hotStuffBackend.New(&config.HotStuff, ctx.NodeKey(), db)
 	}
 	// /BLS-Upgrade
 
@@ -498,16 +498,16 @@ func (s *Ethereum) StartMining(threads int) error {
 			}
 			clique.Authorize(eb, wallet.SignData)
 		}
-		// BLS-Upgrade: injecting the ethereum address if hotstuff used
-		if hotstuff, ok := s.engine.(consensus.HotStuff); ok {
-			wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
-			if wallet == nil || err != nil {
-				log.Error("Etherbase account unavailable locally", "err", err)
-				return fmt.Errorf("signer missing: %v", err)
-			}
-			hotstuff.Authorize(eb, wallet.SignData)
-		}
-		// /BLS-Upgrade
+		// // BLS-Upgrade: injecting the ethereum address if hotstuff used
+		// if hotstuff, ok := s.engine.(consensus.HotStuff); ok {
+		// 	wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
+		// 	if wallet == nil || err != nil {
+		// 		log.Error("Etherbase account unavailable locally", "err", err)
+		// 		return fmt.Errorf("signer missing: %v", err)
+		// 	}
+		// 	hotstuff.Authorize(eb, wallet.SignData)
+		// }
+		// // /BLS-Upgrade
 
 		// If mining is started, we can disable the transaction rejection mechanism
 		// introduced to speed sync times.

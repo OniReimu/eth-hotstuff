@@ -29,7 +29,7 @@ import (
 	// "sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
+	// "github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -572,16 +572,16 @@ func (h *backend) CalcDifficulty(chain consensus.ChainReader, time uint64, paren
 	return big.NewInt(1)
 }
 
-// Authorize injects a private key into the consensus engine to mint new blocks
-// with.
-func (h *backend) Authorize(signer common.Address, signFn func(accounts.Account, string, []byte) ([]byte, error)) {
-	h.sigMu.Lock()
-	defer h.sigMu.Unlock()
+// // Authorize injects a private key into the consensus engine to mint new blocks
+// // with.
+// func (h *backend) Authorize(signer common.Address, signFn func(accounts.Account, string, []byte) ([]byte, error)) {
+// 	h.sigMu.Lock()
+// 	defer h.sigMu.Unlock()
 
-	h.signer = signer
-	h.signFn = signFn
-	h.SetAddress()
-}
+// 	h.signer = signer
+// 	h.signFn = signFn
+// 	h.SetAddress()
+// }
 
 // Close implements consensus.Engine. It's a noop for hotstuff
 func (h *backend) Close() error {

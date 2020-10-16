@@ -33,143 +33,22 @@ import (
 	"go.dedis.ch/kyber/v3/util/random"
 )
 
-// func ExampleEncode() {
-// 	suite := bn256.NewSuite()
-// 	_, public1 := bdn.NewKeyPair(suite, random.New())
-// 	pubd1, _ := public1.MarshalBinary()
-// 	_, public2 := bdn.NewKeyPair(suite, random.New())
-// 	pubd2, _ := public2.MarshalBinary()
+func TestHeaderHash(t *testing.T) {
+	// 0x9e3ef2ec1e5d66c5d47018e08d1c1cca2990621d1fdc56596825a140d74b24ff
+	expectedExtra := common.FromHex("0x0000000000000000000000000000000000000000000000000000000000000000f89af8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b440b8410000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c0")
+	expectedHash := common.HexToHash("0x9e3ef2ec1e5d66c5d47018e08d1c1cca2990621d1fdc56596825a140d74b24ff")
 
-// 	mask, _ := sign.NewMask(suite, []kyber.Point{public1, public2}, nil)
-// 	mask.SetBit(0, true)
-// 	mask.SetBit(1, true)
-
-// 	hst := &HotStuffExtra{
-// 		SpeakerAddr: common.BytesToAddress(hexutil.MustDecode("0x44add0ec310f115a0e603b2d7db9f067778eaf8a")),
-// 		Validators: []common.Address{
-// 			common.BytesToAddress(hexutil.MustDecode("0x44add0ec310f115a0e603b2d7db9f067778eaf8a")),
-// 			common.BytesToAddress(hexutil.MustDecode("0x294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212")),
-// 			common.BytesToAddress(hexutil.MustDecode("0x6beaaed781d2d2ab6350f5c4566a2c6eaac407a6")),
-// 			common.BytesToAddress(hexutil.MustDecode("0x8be76812f765c24641ec63dc2852b378aba2b440")),
-// 		},
-// 		Mask: MaskMarshaling{
-// 			Mask: mask.Mask(),
-// 			Pubs: [][]byte{
-// 				pubd1,
-// 				pubd2,
-// 			},
-// 		},
-// 		AggregatedSig: []byte{},
-// 		Seal:          []byte{},
-// 	}
-
-// 	payload, _ := rlp.EncodeToBytes(&hst)
-// 	fmt.Println(common.ToHex(payload))
-// 	// Output: 0xf86e9444add0ec310f115a0e603b2d7db9f067778eaf8af8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b440c08080
-// }
-
-func TestMarshalBinary(t *testing.T) {
-	msg := []byte("Hello Boneh-Lynn-Shacham")
-	suite := bn256.NewSuite()
-	private1, public1 := bdn.NewKeyPair(suite, random.New())
-	sig1, err := bdn.Sign(suite, private1, msg)
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-	mask, err := sign.NewMask(suite, []kyber.Point{public1}, nil)
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-	mask.SetBit(0, true)
-
-	// pub
-	public1Byte, err := public1.MarshalBinary()
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-	public1B := suite.G2().Point()
-	err = public1B.UnmarshalBinary(public1Byte)
-	if err != nil {
-		t.Errorf("got: %v", err)
+	// for hotstuff consensus
+	header := &Header{MixDigest: HotStuffDigest, Extra: expectedExtra}
+	if !reflect.DeepEqual(header.Hash(), expectedHash) {
+		t.Errorf("expected: %v, but got: %v", expectedHash.Hex(), header.Hash().Hex())
 	}
 
-	// aggsig
-	aggregatedSig, err := bdn.AggregateSignatures(suite, [][]byte{sig1}, mask)
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-
-	sig, err := aggregatedSig.MarshalBinary()
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-	aggregatedSig2 := suite.G1().Point()
-	err = aggregatedSig2.UnmarshalBinary(sig)
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-
-	// aggkey
-	aggregatedKey, err := bdn.AggregatePublicKeys(suite, mask)
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-	aggregatedKeyByte, err := aggregatedKey.MarshalBinary()
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-	aggregatedKey2 := suite.G2().Point()
-	err = aggregatedKey2.UnmarshalBinary(aggregatedKeyByte)
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-}
-
-func TestAggregateSign(t *testing.T) {
-	msg := []byte("Hello Boneh-Lynn-Shacham")
-	suite := bn256.NewSuite()
-	private1, public1 := bdn.NewKeyPair(suite, random.New())
-	private2, public2 := bdn.NewKeyPair(suite, random.New())
-
-	sig1, err := bdn.Sign(suite, private1, msg)
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-	sig2, err := bdn.Sign(suite, private2, msg)
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-	mask, _ := sign.NewMask(suite, []kyber.Point{public1, public2}, nil)
-	mask.SetBit(0, true)
-	mask.SetBit(1, true)
-
-	aggregatedSig, err := bdn.AggregateSignatures(suite, [][]byte{sig1, sig2}, mask)
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-
-	aggregatedKey, err := bdn.AggregatePublicKeys(suite, mask)
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-	aggregatedKeyByte, err := aggregatedKey.MarshalBinary()
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-	aggregatedKey2 := suite.G2().Point()
-	err = aggregatedKey2.UnmarshalBinary(aggregatedKeyByte)
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-
-	sig, err := aggregatedSig.MarshalBinary()
-	if err != nil {
-		t.Errorf("got: %v", err)
-	}
-
-	err = bdn.Verify(suite, aggregatedKey2, msg, sig)
-	if err != nil {
-		t.Errorf("got: %v", err)
+	// append useless information to extra-data
+	unexpectedExtra := append(expectedExtra, []byte{1, 2, 3}...)
+	header.Extra = unexpectedExtra
+	if !reflect.DeepEqual(header.Hash(), rlpHash(header)) {
+		t.Errorf("expected: %v, but got: %v", rlpHash(header).Hex(), header.Hash().Hex())
 	}
 }
 
@@ -179,12 +58,8 @@ func TestEncodeAndDecode(t *testing.T) {
 	_, public2 := bdn.NewKeyPair(suite, random.New())
 
 	mask, _ := sign.NewMask(suite, []kyber.Point{public1, public2}, nil)
-	// pubs := mask.Publics()
-	// pub1, _ := pubs[0].MarshalBinary()
-	// pub2, _ := pubs[1].MarshalBinary()
-	// if len(pubs) != 2 {
-	// 	t.Errorf("expected: %v, but got: %v", 2, len(pubs))
-	// }
+	mask.SetBit(0, true)
+
 	aggregatedKey, err := bdn.AggregatePublicKeys(suite, mask)
 	if err != nil {
 		t.Errorf("got: %v", err)
@@ -213,6 +88,11 @@ func TestEncodeAndDecode(t *testing.T) {
 		t.Errorf("got: %v", err)
 	}
 
+	// expectedKeyByte := common.FromHex("1234567890")
+	// if !bytes.Equal(expectedKeyByte, b.Bytes()) {
+	// 	t.Errorf("expected: %v, but got: %v, and the aggbytes: %v", expectedKeyByte, common.ToHex(b.Bytes()), common.ToHex(aggregatedKeyByte))
+	// }
+
 	vanity := bytes.Repeat([]byte{0x00}, HotStuffExtraVanity)
 	h := &Header{Extra: append(vanity, b.Bytes()...)}
 	HotStuffExtra, err := ExtractHotStuffExtra(h)
@@ -231,7 +111,7 @@ func TestExtractToHotStuff(t *testing.T) {
 		{
 			// normal case
 			bytes.Repeat([]byte{0x00}, HotStuffExtraVanity),
-			hexutil.MustDecode("0xf858f8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b44080c0"),
+			hexutil.MustDecode("0xf8f09444add0ec310f115a0e603b2d7db9f067778eaf8af8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b44080b8801b4f47e0a57dcb7452cb6821391981f88ffad22ddce62ff1dbfee08175129cfb3b6418f8a5e87be3d2cdf35ecf37447f1109705f7e07c798fabc34de43965e5f5c1f34317329a22c4bc3472163ab97af56642292797c71124e368956cd7c81f57b8e898252dd2aadf9a30dfe1d39888ae26608ba2cf88c97b9f5515c11fa2af68080"),
 			&HotStuffExtra{
 				SpeakerAddr: common.BytesToAddress(hexutil.MustDecode("0x44add0ec310f115a0e603b2d7db9f067778eaf8a")),
 				Validators: []common.Address{
@@ -241,6 +121,7 @@ func TestExtractToHotStuff(t *testing.T) {
 					common.BytesToAddress(hexutil.MustDecode("0x8be76812f765c24641ec63dc2852b378aba2b440")),
 				},
 				Mask:          []byte{},
+				AggregatedKey: common.FromHex("0x1b4f47e0a57dcb7452cb6821391981f88ffad22ddce62ff1dbfee08175129cfb3b6418f8a5e87be3d2cdf35ecf37447f1109705f7e07c798fabc34de43965e5f5c1f34317329a22c4bc3472163ab97af56642292797c71124e368956cd7c81f57b8e898252dd2aadf9a30dfe1d39888ae26608ba2cf88c97b9f5515c11fa2af6"),
 				AggregatedSig: []byte{},
 				Seal:          []byte{},
 			},

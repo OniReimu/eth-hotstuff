@@ -17,6 +17,7 @@
 package node
 
 import (
+	"crypto/ecdsa"
 	"path/filepath"
 	"reflect"
 
@@ -84,6 +85,14 @@ func (ctx *ServiceContext) Service(service interface{}) error {
 	}
 	return ErrServiceUnknown
 }
+
+// BLS-Upgrade
+// NodeKey returns node key from config
+func (ctx *ServiceContext) NodeKey() *ecdsa.PrivateKey {
+	return ctx.Config.NodeKey()
+}
+
+// /BLS-Upgrade
 
 // ExtRPCEnabled returns the indicator whether node enables the external
 // RPC(http, ws or graphql).

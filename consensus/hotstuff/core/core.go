@@ -40,7 +40,9 @@ func New(backend hotstuff.Backend, config *hotstuff.Config) CoreEngine {
 		config: config,
 		// state:              StateAcceptRequest,
 		state:                           StateSendPub,
+		address:                         backend.Address(),
 		handlerWg:                       new(sync.WaitGroup),
+		logger:                          log.New("address", backend.Address()),
 		backend:                         backend,
 		backlogs:                        make(map[common.Address]*prque.Prque),
 		backlogsMu:                      new(sync.Mutex),
@@ -196,7 +198,7 @@ func (c *core) IsSpeaker() bool {
 	if v == nil {
 		return false
 	}
-	return v.IsSpeaker(c.backend.GetAddress())
+	return v.IsSpeaker(c.backend.Address())
 }
 
 func (c *core) IsCurrentProposal(blockHash common.Hash) bool {
@@ -207,10 +209,10 @@ func (c *core) Address() common.Address {
 	return c.address
 }
 
-func (c *core) SetAddressAndLogger(addr common.Address) {
-	c.address = addr
-	c.logger = log.New("address", c.backend.GetAddress())
-}
+// func (c *core) SetAddressAndLogger(addr common.Address) {
+// 	c.address = addr
+// 	c.logger = log.New("address", c.backend.GetAddress())
+// }
 
 func (c *core) commit(roundChange bool, round *big.Int) {
 	c.setState(StateResponsed)

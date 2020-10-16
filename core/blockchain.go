@@ -187,10 +187,6 @@ type BlockChain struct {
 	badBlocks       *lru.Cache                     // Bad block cache
 	shouldPreserve  func(*types.Block) bool        // Function used to determine whether should preserve the given block.
 	terminateInsert func(common.Hash, uint64) bool // Testing hook used to terminate ancient receipt chain insertion.
-
-	// BLS-Upgrade: setting for dynamic miners list
-	voteHistory VoteHistory //Used for storing and retrieving past votes.
-	// /BLS-Upgrade
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -241,12 +237,6 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	if err != nil {
 		return nil, err
 	}
-
-	// BLS-Upgrade: initialize the vote history
-	var voteHistory VoteHistory
-	voteHistory.init(bc.hc)
-	bc.voteHistory = voteHistory
-	// /BLS-Upgrade
 
 	bc.genesisBlock = bc.GetBlockByNumber(0)
 	if bc.genesisBlock == nil {
@@ -1479,15 +1469,6 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	// Set new head.
 	if status == CanonStatTy {
 		bc.writeHeadBlock(block)
-
-		// BLS-Upgrade: update the voteCache when a new voting block is received.
-		if block.IsVotingBlock() {
-			addrList := block.SignerList()
-			// log.Error("Updating last block", "num", block.Header().Number.Uint64(), "list", common.AddrToHexSlice(addrList))
-			bc.voteHistory.UpdateLast(block.Header().Number.Uint64(), addrList)
-			log.Info("Voting has been activated", "blockNum", block.NumberU64())
-		}
-		// /BLS-Upgrade
 	}
 	bc.futureBlocks.Remove(block.Hash())
 
@@ -1509,22 +1490,6 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	}
 	return status, nil
 }
-
-// // BLS-Upgrade: for BroadcastXXX in handler.go, we need to fetch the CURRENT mining list,
-// // which is the current header + 1.
-// func (bc *BlockChain) GetLastVote(num ...uint64) []common.Address {
-// 	if len(num) > 1 {
-// 		log.Error("Too many arguments passed to GetLastVote")
-// 		return nil
-// 	}
-
-// 	if num == nil {
-// 		num = append(num, bc.CurrentHeader().Number.Uint64()+1)
-// 	}
-// 	return bc.voteHistory.GetLastVote(num[0])
-// }
-
-// // /BLS-Upgrade
 
 // addFutureBlock checks if the block is within the max allowed window to get
 // accepted for future processing, and returns an error if the block is too far

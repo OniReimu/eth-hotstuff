@@ -27,11 +27,14 @@ import (
 
 // Backend provides application specific functions for HotStuff core (consensus/hotstuff/backend/backend.go)
 type Backend interface {
-	// GetAddress returns the owner's address
-	GetAddress() common.Address
+	// // GetAddress returns the owner's address
+	// GetAddress() common.Address
 
-	// SetAddress sets the owner's address to core
-	SetAddress()
+	// // SetAddress sets the owner's address to core
+	// SetAddress()
+
+	// Address returns the owner's address
+	Address() common.Address
 
 	// Validators returns the validator set
 	Validators(proposal Proposal) ValidatorSet

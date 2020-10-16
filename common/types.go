@@ -55,6 +55,11 @@ func BytesToHash(b []byte) Hash {
 	return h
 }
 
+// BLS-Upgrade
+func StringToHash(s string) Hash { return BytesToHash([]byte(s)) }
+
+// /BLS-Upgrade
+
 // BigToHash sets byte representation of b to hash.
 // If b is larger than len(h), b will be cropped from the left.
 func BigToHash(b *big.Int) Hash { return BytesToHash(b.Bytes()) }
@@ -182,6 +187,11 @@ func BytesToAddress(b []byte) Address {
 	a.SetBytes(b)
 	return a
 }
+
+// BLS-Upgrade
+func StringToAddress(s string) Address { return BytesToAddress([]byte(s)) }
+
+// /BLS-Upgrade
 
 // BigToAddress returns Address with byte values of b.
 // If b is larger than len(h), b will be cropped from the left.

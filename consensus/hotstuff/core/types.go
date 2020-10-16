@@ -39,7 +39,7 @@ type CoreEngine interface {
 	// to avoid any race condition of coming propagated blocks
 	IsCurrentProposal(blockHash common.Hash) bool
 
-	SetAddressAndLogger(addr common.Address)
+	// SetAddressAndLogger(addr common.Address)
 
 	CurrentRoundstate() *roundState
 }

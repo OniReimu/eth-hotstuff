@@ -20,7 +20,7 @@ package consensus
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/accounts"
+	// "github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -140,7 +140,7 @@ type PoW interface {
 type HotStuff interface {
 	Engine
 
-	Authorize(signer common.Address, signFn func(accounts.Account, string, []byte) ([]byte, error))
+	// Authorize(signer common.Address, signFn func(accounts.Account, string, []byte) ([]byte, error))
 	// Start starts the engine
 	Start(chain ChainReader, currentBlock func() *types.Block, hasBadBlock func(hash common.Hash) bool) error
 

@@ -173,7 +173,8 @@ func (h *Header) NumSigners() int { return len(h.SignerListByte()) / common.Addr
 func (h *Header) IthSigner(i int) common.Address {
 	return common.BytesToAddress(h.Extra[HotStuffExtraVanity+i*common.AddressLength : HotStuffExtraVanity+i*common.AddressLength+common.AddressLength])
 }
-func (h *Header) IsVotingBlock() bool { return h.NumSigners() > 0 }
+
+// func (h *Header) IsVotingBlock() bool { return h.NumSigners() > 0 }
 
 // /BLS-Upgrade
 
@@ -377,7 +378,8 @@ func (b *Block) SignerListByte() []byte         { return b.header.SignerListByte
 func (b *Block) SignerList() []common.Address   { return b.header.SignerList() }
 func (b *Block) NumSigners() int                { return b.header.NumSigners() }
 func (b *Block) IthSigner(i int) common.Address { return b.header.IthSigner(i) }
-func (b *Block) IsVotingBlock() bool            { return b.header.IsVotingBlock() }
+
+// func (b *Block) IsVotingBlock() bool            { return b.header.IsVotingBlock() }
 
 // /BLS-Upgrade
 

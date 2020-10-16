@@ -25,10 +25,13 @@ import (
 	"math/big"
 	// "runtime"
 	// "strconv"
+	"crypto/ecdsa"
+	// "fmt"
+	// "reflect"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts"
+	// "github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	// "github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -79,8 +82,9 @@ type backend struct {
 	recentMessages *lru.ARCCache // the cache of peer's messages
 	knownMessages  *lru.ARCCache // the cache of self messages
 
-	signer common.Address                                         // Ethereum address of the signing key
-	signFn func(accounts.Account, string, []byte) ([]byte, error) // Signer function to authorize hashes with
+	privateKey *ecdsa.PrivateKey
+	signer     common.Address // Ethereum address of the signing key
+	// signFn func(accounts.Account, string, []byte) ([]byte, error) // Signer function to authorize hashes with
 
 	// The channels for hotstuff engine notifications
 	commitCh          chan *types.Block
@@ -106,7 +110,7 @@ type backend struct {
 	mask              *sign.Mask // update whenever the size of aggregatedKeyPair increases
 }
 
-func New(config *hotstuff.Config, db ethdb.Database) consensus.HotStuff {
+func New(config *hotstuff.Config, privateKey *ecdsa.PrivateKey, db ethdb.Database) consensus.HotStuff {
 	recents, _ := lru.NewARC(inmemorySnapshots)
 	signatures, _ := lru.NewARC(inmemorySignatures)
 	recentMessages, _ := lru.NewARC(inmemoryPeers)
@@ -119,6 +123,7 @@ func New(config *hotstuff.Config, db ethdb.Database) consensus.HotStuff {
 		commitCh:          make(chan *types.Block, 1),
 		coreStarted:       false,
 		hotStuffEventMux:  new(event.TypeMux),
+		privateKey:        privateKey,
 		signatures:        signatures,
 		recentMessages:    recentMessages,
 		knownMessages:     knownMessages,
@@ -137,14 +142,19 @@ func (h *backend) EventMux() *event.TypeMux {
 	return h.hotStuffEventMux
 }
 
-// SetAddress implements hotstuff.Backend.SetAddress
-func (h *backend) SetAddress() {
-	h.core.SetAddressAndLogger(h.signer)
-}
+// // SetAddress implements hotstuff.Backend.SetAddress
+// func (h *backend) SetAddress() {
+// 	h.core.SetAddressAndLogger(h.signer)
+// }
 
-// GetAddress implements hotstuff.Backend.GetAddress
-func (h *backend) GetAddress() common.Address {
-	return h.signer // This is initialized in eth/backend.go - StartMining()
+// // GetAddress implements hotstuff.Backend.GetAddress
+// func (h *backend) GetAddress() common.Address {
+// 	return h.signer // This is initialized in eth/backend.go - StartMining()
+// }
+
+// Address implements hotstuff.Backend.Address
+func (h *backend) Address() common.Address {
+	return h.signer
 }
 
 // Validators implements hotstuff.Backend.Validators
@@ -171,7 +181,7 @@ func (h *backend) Gossip(valSet hotstuff.ValidatorSet, payload []byte) error {
 
 	targets := make(map[common.Address]bool)
 	for _, val := range valSet.List() { // hotstuff/validator/default.go - defaultValidator
-		if val.Address() != h.GetAddress() {
+		if val.Address() != h.Address() {
 			targets[val.Address()] = true
 		}
 	}
@@ -200,7 +210,7 @@ func (h *backend) Gossip(valSet hotstuff.ValidatorSet, payload []byte) error {
 
 // Broadcast implements hotstuff.Backend.Unicast
 func (h *backend) Unicast(valSet hotstuff.ValidatorSet, payload []byte) error {
-	if valSet.IsSpeaker(h.GetAddress()) {
+	if valSet.IsSpeaker(h.Address()) {
 		return errInvalidProposal
 	}
 
@@ -209,7 +219,7 @@ func (h *backend) Unicast(valSet hotstuff.ValidatorSet, payload []byte) error {
 
 	targets := make(map[common.Address]bool)
 	for _, val := range valSet.List() {
-		if val.Address() != h.GetAddress() {
+		if val.Address() != h.Address() {
 			targets[val.Address()] = true
 		}
 	}
@@ -257,16 +267,21 @@ func (h *backend) Commit(proposal hotstuff.Proposal, valSet hotstuff.ValidatorSe
 	header.Extra = append(header.Extra[:types.HotStuffExtraVanity], payload...)
 
 	// Sign all the things (the last 65B Seal)!
-	sighash, err := h.signFn(accounts.Account{Address: h.GetAddress()}, "", HotStuffRLP(header)) // Need to check if the empty string works
+	sighash, err := h.Sign(HotStuffRLP(header))
 	if err != nil {
 		return err
 	}
+	// sighash, err := h.signFn(accounts.Account{Address: h.GetAddress()}, "", HotStuffRLP(header)) // Need to check if the empty string works
+	// if err != nil {
+	// 	return err
+	// }
+
 	copy(header.Extra[len(header.Extra)-extraSeal:], sighash)
 
 	// update block's header
 	newBlock := block.WithSeal(header)
 
-	h.logger.Info("Committed", "address", h.GetAddress(), "hash", proposal.Hash(), "number", proposal.Number().Uint64())
+	h.logger.Info("Committed", "address", h.Address(), "hash", proposal.Hash(), "number", proposal.Number().Uint64())
 	// - if the proposed and committed blocks are the same, send the proposed hash
 	//   to commit channel, which is being watched inside the engine.Seal() function.
 	// - otherwise, we try to insert the block.
@@ -325,7 +340,8 @@ func (h *backend) Verify(proposal hotstuff.Proposal) (time.Duration, error) {
 // Sign implements hotstuff.Backend.Sign
 func (h *backend) Sign(data []byte) ([]byte, error) {
 	hashData := crypto.Keccak256(data)
-	return h.signFn(accounts.Account{Address: h.GetAddress()}, "", hashData)
+	// return h.signFn(accounts.Account{Address: h.GetAddress()}, "", hashData)
+	return crypto.Sign(hashData, h.privateKey)
 }
 
 // CheckSignature implements hotstuff.Backend.CheckSignature

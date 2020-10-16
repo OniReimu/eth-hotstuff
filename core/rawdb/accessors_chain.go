@@ -222,34 +222,6 @@ func ReadHeader(db ethdb.Reader, hash common.Hash, number uint64) *types.Header 
 	return header
 }
 
-// // BLS-Upgrade: a function independent of voteHistory, that will retrieve the last vote.
-// //For use in the api only. (Deprecated by GetLastVote)
-// func ReadRecentVote(db ethdb.Reader, hash common.Hash, number uint64, genesisList []common.Address) ([]common.Address, error) {
-// 	if number == 0 {
-// 		return genesisList, nil
-// 	}
-
-// 	addrList := make([]common.Address, 0, params.MaximumMiner)
-// 	block := ReadBlock(db, hash, number)
-
-// 	for {
-// 		if block == nil {
-// 			return nil, errors.New("Header not found")
-// 		}
-
-// 		if block.IsVotingBlock() {
-// 			for i := 0; i < block.NumSigners(); i++ {
-// 				addrList = append(addrList, block.IthSigner(i))
-// 			}
-// 			return addrList, nil
-// 		} else {
-// 			block = ReadBlock(db, block.ParentHash(), block.NumberU64()-1)
-// 		}
-// 	}
-// }
-
-// // /BLS-Upgrade
-
 // WriteHeader stores a block header into the database and also stores the hash-
 // to-number mapping.
 func WriteHeader(db ethdb.KeyValueWriter, header *types.Header) {

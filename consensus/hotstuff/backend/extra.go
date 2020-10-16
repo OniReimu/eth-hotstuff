@@ -22,7 +22,7 @@ func (h *backend) prepareExtra(header *types.Header) ([]byte, error) {
 
 	// Mask and AggregatedSig will be filled in afterwards
 	hs := &types.HotStuffExtra{
-		SpeakerAddr: h.GetAddress(),
+		SpeakerAddr: h.Address(),
 		Seal:        make([]byte, types.HotStuffExtraSeal),
 	}
 

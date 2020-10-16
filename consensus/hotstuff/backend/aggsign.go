@@ -57,7 +57,7 @@ func (h *backend) AddAggPub(valSet hotstuff.ValidatorSet, address common.Address
 
 // AggregatedSignedFromSingle implements hotstuff.Backend.AggregatedSignedFromSingle
 func (h *backend) AggregatedSignedFromSingle(msg []byte) ([]byte, []byte, error) {
-	if h.aggregatedPub == nil || h.aggregatedPub == nil {
+	if h.aggregatedPub == nil || h.aggregatedPrv == nil {
 		return nil, nil, errIncorrectAggInfo
 	}
 	pubByte, err := h.aggregatedPub.MarshalBinary()
@@ -135,7 +135,7 @@ func (h *backend) RemoveParticipants(valSet hotstuff.ValidatorSet, addresses ...
 
 func (h *backend) collectSignature(valSet hotstuff.ValidatorSet, collection map[common.Address][]byte) error {
 	for addr, pubByte := range collection {
-		if addr == h.GetAddress() {
+		if addr == h.Address() {
 			return errInvalidProposal
 		}
 		pub := h.config.Suite.G2().Point()
