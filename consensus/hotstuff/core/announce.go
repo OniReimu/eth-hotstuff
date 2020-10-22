@@ -101,6 +101,8 @@ func (c *core) handleAnnounce(msg *message, src hotstuff.Validator) error {
 		c.acceptAnnounce(announce)
 		c.setState(StateAnnounced)
 		c.sendResponse()
+	} else if c.state == StateSendPub {
+		logger.Warn("No enough aggregated public key collected", "has", c.countAggPub(), "want", c.valSet.Size())
 	}
 
 	return nil

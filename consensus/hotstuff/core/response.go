@@ -70,7 +70,7 @@ func (c *core) handleResponse(msg *message, src hotstuff.Validator) error {
 
 	c.acceptResponse(msg, src)
 
-	// Commit the proposal once we have enough COMMIT messages and we are not in the Committed state.
+	// Commit the proposal once we have enough RESPONSE messages and we are not in the Committed state.
 	if c.current.Responses.Size() >= c.HotStuffSize() && c.state.Cmp(StateResponsed) < 0 {
 		c.commit(false, new(big.Int))
 	}
@@ -101,4 +101,26 @@ func (c *core) acceptResponse(msg *message, src hotstuff.Validator) error {
 	}
 
 	return nil
+}
+
+func (c *core) getResponseMessage() (*message, error) {
+	sub := c.current.Subject()
+	encodedSubject, err := Encode(sub)
+	if err != nil {
+		return nil, err
+	}
+
+	msg := &message{
+		Code: msgResponse,
+		Msg:  encodedSubject,
+	}
+	payload, err := c.finalizeMessage(msg)
+	if err != nil {
+		return nil, err
+	}
+	msgNew := new(message)
+	if err := msgNew.FromPayload(payload, c.validateFn); err != nil {
+		return nil, err
+	}
+	return msgNew, nil
 }

@@ -5,13 +5,13 @@ package backend
 import (
 	"bytes"
 
-	// "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // prepareExtra returns a extra-data of the given header and validators
-func (h *backend) prepareExtra(header *types.Header) ([]byte, error) {
+func prepareExtra(header *types.Header, speaker common.Address, val []common.Address) ([]byte, error) {
 	var buf bytes.Buffer
 
 	// compensate the lack bytes if header.Extra is not enough HotStuffExtraVanity bytes.
@@ -22,8 +22,12 @@ func (h *backend) prepareExtra(header *types.Header) ([]byte, error) {
 
 	// Mask and AggregatedSig will be filled in afterwards
 	hs := &types.HotStuffExtra{
-		SpeakerAddr: h.Address(),
+		SpeakerAddr: speaker,
 		Seal:        make([]byte, types.HotStuffExtraSeal),
+	}
+	// Only the genesis contains the Validator set
+	if header.Number.Int64() == 0 {
+		hs.Validators = val
 	}
 
 	payload, err := rlp.EncodeToBytes(&hs)

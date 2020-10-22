@@ -135,7 +135,7 @@ const (
 	MinimumMiner       uint64 = 4   // Minimum number of participated miners
 	MaximumMiner       uint64 = 100 // Maximum number of participated miners (for tests)
 	SendPubTimeout     uint64 = 180 // Timeout for broadcasting aggPub
-	MinimumUnconfirmed uint64 = 3   // Minimum number of unconfirmed blocks
+	MinimumUnconfirmed uint64 = 2   // Minimum number of unconfirmed blocks (should be 3-1)
 	// /BLS-Upgrade
 )
 

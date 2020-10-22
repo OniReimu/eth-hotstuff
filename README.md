@@ -38,12 +38,12 @@ This implies that an unconfirmation window (used in PoW) will be implemented eve
 
 By reducing the communication complexity to O(N), a scalable BFT-based consensus mechanism can be achieved in large-scale networks.
 
-## TODO
+## TODO (updated on 22/10/2020)
 
 - [x] Coding
-- [ ] Unit test
-- [ ] Peer reviewed by Kevin
-- [ ] Run and pressure test
+- [x] Unit test
+- ~~[ ] Peer reviewed by Kevin~~
+- [ ] Run unit test and pressure test
 - [ ] Consensus engine APIs
 - [ ] VRF committee-picker
 - [ ] Others

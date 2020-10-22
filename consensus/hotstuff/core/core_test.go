@@ -18,14 +18,14 @@ package core
 
 import (
 	"math/big"
-	// "reflect"
-	// "testing"
-	// "time"
+	"reflect"
+	"testing"
+	"time"
 
-	// "github.com/ethereum/go-ethereum/common"
-	// "github.com/ethereum/go-ethereum/consensus/hotstuff"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/hotstuff"
 	"github.com/ethereum/go-ethereum/core/types"
-	// elog "github.com/ethereum/go-ethereum/log"
+	elog "github.com/ethereum/go-ethereum/log"
 )
 
 func makeBlock(number int64) *types.Block {
@@ -38,4 +38,59 @@ func makeBlock(number int64) *types.Block {
 	}
 	block := &types.Block{}
 	return block.WithSeal(header)
+}
+
+func newTestProposal() hotstuff.Proposal {
+	return makeBlock(1)
+}
+
+func TestNewRequest(t *testing.T) {
+	testLogger.SetHandler(elog.StdoutHandler)
+
+	N := uint64(4)
+	F := uint64(1)
+
+	sys := NewTestSystemWithBackend(N, F)
+
+	close := sys.Run(true)
+	defer close()
+
+	request1 := makeBlock(1)
+	sys.backends[0].NewRequest(request1)
+
+	<-time.After(1 * time.Second)
+
+	request2 := makeBlock(2)
+	sys.backends[0].NewRequest(request2)
+
+	<-time.After(1 * time.Second)
+
+	for _, backend := range sys.backends {
+		if len(backend.committedMsgs) != 2 {
+			t.Errorf("the number of executed requests mismatch: have %v, want 2", len(backend.committedMsgs))
+		}
+		if !reflect.DeepEqual(request1.Number(), backend.committedMsgs[0].commitProposal.Number()) {
+			t.Errorf("the number of requests mismatch: have %v, want %v", request1.Number(), backend.committedMsgs[0].commitProposal.Number())
+		}
+		if !reflect.DeepEqual(request2.Number(), backend.committedMsgs[1].commitProposal.Number()) {
+			t.Errorf("the number of requests mismatch: have %v, want %v", request2.Number(), backend.committedMsgs[1].commitProposal.Number())
+		}
+	}
+}
+
+func TestHotStuffSize(t *testing.T) {
+	N := uint64(4)
+	F := uint64(1)
+
+	sys := NewTestSystemWithBackend(N, F)
+	backend := sys.backends[0]
+	c := backend.engine.(*core)
+
+	valSet := c.valSet
+	for i := 1; i <= 1000; i++ {
+		valSet.AddValidator(common.StringToAddress(string(i)))
+		if 3*c.HotStuffSize() < (2*valSet.Size() + 1) {
+			t.Errorf("hotstuffSize constraint failed, expected value (3*HotStuffSize < 2*Size+1 to be:%v, got: %v, for size: %v", true, false, valSet.Size())
+		}
+	}
 }

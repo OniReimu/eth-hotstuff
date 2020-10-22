@@ -182,7 +182,7 @@ func (c *core) handleCheckedMsg(msg *message, src hotstuff.Validator) error {
 	case msgResponse:
 		return testBacklog(c.handleResponse(msg, src))
 	case msgRoundChange:
-		// return testBacklog(c.handleRoundChange(msg, src))
+		return testBacklog(c.handleRoundChange(msg, src))
 	default:
 		logger.Error("Invalid message", "msg", msg)
 	}
@@ -191,16 +191,17 @@ func (c *core) handleCheckedMsg(msg *message, src hotstuff.Validator) error {
 }
 
 func (c *core) handleTimeoutMsg() {
-	// // If we're not waiting for round change yet, we can try to catch up
-	// // the max round with F+1 round change message. We only need to catch up
-	// // if the max round is larger than current round.
-	// if !c.waitingForRoundChange {
-	// 	maxRound := c.roundChangeSet.MaxRound(c.valSet.F() + 1)
-	// 	if maxRound != nil && maxRound.Cmp(c.current.Round()) > 0 {
-	// 		c.sendRoundChange(maxRound)
-	// 		return
-	// 	}
-	// }
+	// If we're not waiting for round change yet, we can try to catch up
+	// the max round with F+1 round change message. We only need to catch up
+	// if the max round is larger than current round.
+	// TODO: Need to check if this also works for hotstuff
+	if !c.waitingForRoundChange {
+		maxRound := c.roundChangeSet.MaxRound(c.valSet.F() + 1)
+		if maxRound != nil && maxRound.Cmp(c.current.Round()) > 0 {
+			c.sendRoundChange(maxRound)
+			return
+		}
+	}
 
 	lastProposal, _ := c.backend.LastProposal()
 	if lastProposal != nil && lastProposal.Number().Cmp(c.current.Height()) >= 0 {

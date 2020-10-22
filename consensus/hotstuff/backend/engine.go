@@ -21,10 +21,11 @@ package backend
 import (
 	"bytes"
 	"errors"
+
 	// "io"
 	"math/big"
 	"math/rand"
-	"runtime"
+
 	// "strconv"
 	// "sync"
 	"time"
@@ -35,11 +36,13 @@ import (
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/hotstuff"
+
 	// hotStuffCore "github.com/ethereum/go-ethereum/consensus/hotstuff/core"
 	"github.com/ethereum/go-ethereum/consensus/hotstuff/validator"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+
 	// "github.com/ethereum/go-ethereum/ethdb"
 	// "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
@@ -357,10 +360,10 @@ func (h *backend) verifyAggregatedSig(chain consensus.ChainReader, header *types
 		return errEmptyAggregatedSig
 	}
 
-	// TODO: Verify the aggregated signature
-	// Roundchange-block -> roundchange == true
+	// Verify the aggregated signature
 	currentHeight, _ := h.LastProposal()
 	if number-1 == currentHeight.Number().Uint64() {
+		// Roundchange-block -> roundchange == true
 		if err := h.verifySig(true, extra.AggregatedKey, extra.AggregatedSig); err != nil {
 			return err
 		}
@@ -436,7 +439,7 @@ func (h *backend) Prepare(chain consensus.ChainReader, header *types.Header) err
 	h.sigMu.RUnlock()
 
 	// add validators in snapshot to extraData's validators section
-	extra, err := h.prepareExtra(header)
+	extra, err := prepareExtra(header, h.Address(), nil)
 	if err != nil {
 		return err
 	}
@@ -552,7 +555,7 @@ func (h *backend) Seal(chain consensus.ChainReader, block *types.Block, results 
 			}
 		}
 		// Check goroutines to avoid memory leaks (for tests)
-		h.logger.Trace("Number of Goroutines", "number", runtime.NumGoroutine())
+		// h.logger.Trace("Number of Goroutines", "number", runtime.NumGoroutine())
 		// pprof.Lookup("goroutine").WriteTo(os.Stdout, 1) //Prints out goroutine stack
 
 		// newBlock, err := h.Consensus(chain, block, stop)
@@ -599,11 +602,6 @@ func (h *backend) APIs(chain consensus.ChainReader) []rpc.API {
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
-func (h *backend) SealHash(header *types.Header) common.Hash {
-	return SealHash(header)
-}
-
-// SealHash returns the hash of a block prior to it being sealed.
 func SealHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
 
@@ -611,6 +609,11 @@ func SealHash(header *types.Header) (hash common.Hash) {
 	// encodeSigHeader(hasher, header)
 	hasher.Sum(hash[:0])
 	return hash
+}
+
+// SealHash returns the hash of a block prior to it being sealed.
+func (h *backend) SealHash(header *types.Header) common.Hash {
+	return SealHash(header)
 }
 
 // HotStuffRLP returns the rlp bytes which needs to be signed for the hotstuff
@@ -772,4 +775,43 @@ func (h *backend) snapshot(chain consensus.ChainReader, number uint64, hash comm
 		h.logger.Trace("Stored voting snapshot to disk", "number", snap.Number, "hash", snap.Hash)
 	}
 	return snap, err
+}
+
+// update timestamp and signature of the block based on its number of transactions
+func (h *backend) updateBlock(parent *types.Header, block *types.Block) (*types.Block, error) {
+	header := block.Header()
+	// sign the hash
+	seal, err := h.Sign(SealHash(header).Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	err = writeSeal(header, seal)
+	if err != nil {
+		return nil, err
+	}
+
+	return block.WithSeal(header), nil
+}
+
+// writeSeal writes the extra-data field of the given header with the given seals.
+// suggest to rename to writeSeal.
+func writeSeal(h *types.Header, seal []byte) error {
+	if len(seal)%types.HotStuffExtraSeal != 0 {
+		return errInvalidSignature
+	}
+
+	hotstuffExtra, err := types.ExtractHotStuffExtra(h)
+	if err != nil {
+		return err
+	}
+
+	hotstuffExtra.Seal = seal
+	payload, err := rlp.EncodeToBytes(&hotstuffExtra)
+	if err != nil {
+		return err
+	}
+
+	h.Extra = append(h.Extra[:types.HotStuffExtraVanity], payload...)
+	return nil
 }

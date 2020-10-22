@@ -22,6 +22,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
+	"go.dedis.ch/kyber/v3/pairing/bn256"
 	// "go.dedis.ch/kyber/v3"
 )
 
@@ -91,6 +92,9 @@ type Backend interface {
 	// AddAggPub adds new aggPub to local recording everytime the valset gets updated
 	AddAggPub(valSet ValidatorSet, address common.Address, pubByte []byte) (int, error)
 
+	// CountAggPub retrieves the size of current aggregated public key collection
+	CountAggPub() int
+
 	// AggregatedSignedFromSingle assigns value to msg.AggPub and msg.AggSign
 	AggregatedSignedFromSingle(msg []byte) ([]byte, []byte, error)
 
@@ -102,4 +106,7 @@ type Backend interface {
 
 	// RemoveParticipants removes arbitrary pubs from the current mask
 	RemoveParticipants(valSet ValidatorSet, addresses ...common.Address)
+
+	// SetAggInfo assigns new keypair for unit testing
+	SetAggInfo(unitTest bool, suite *bn256.Suite)
 }

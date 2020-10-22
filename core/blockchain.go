@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/consensus"
+
 	// "github.com/ethereum/go-ethereum/consensus/hotstuff"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -1448,7 +1449,9 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		}
 	}
 	// BLS-Upgrade
-	// Only for roundChange
+	// Only for roundChange. Always reorg the parent block because of the three-phase change view.
+	// bc.currentBlock() is bound to be reorganized for both cases. Check https://zhuanlan.zhihu.com/p/78772451.
+	// Only bc.GetBlock(current.number-2) is the last CONFIRMED block.
 	if _, ok := bc.engine.(consensus.HotStuff); ok {
 		if externTd.Cmp(localTd) < 0 && block.NumberU64()+1 == currentBlock.NumberU64() {
 			reorg = true

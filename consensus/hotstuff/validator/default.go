@@ -160,6 +160,7 @@ func stickySpeaker(valSet hotstuff.ValidatorSet, speaker common.Address, round u
 	return valSet.GetByIndex(pick)
 }
 
+// TODO: implement VRF
 func vrfSpeaker(valSet hotstuff.ValidatorSet, speaker common.Address, round uint64) hotstuff.Validator {
 	return nil
 }

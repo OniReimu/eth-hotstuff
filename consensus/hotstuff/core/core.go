@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/hotstuff"
 	"github.com/ethereum/go-ethereum/params"
+
 	// "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -225,6 +226,7 @@ func (c *core) commit(roundChange bool, round *big.Int) {
 		if proposal != nil {
 			for _, msg := range c.current.Responses.Values() {
 				if msg.Code == msgResponse {
+					// Notes: msg.AggPub and msg.AggSign are assigned by calling core.go/finalizeMessage at the delegators' sides
 					collectionPub[msg.Address], collectionSig[msg.Address] = msg.AggPub, msg.AggSign
 				}
 			}
@@ -280,6 +282,10 @@ func (c *core) startNewRound(round *big.Int) {
 			c.consensusTimestamp = time.Time{}
 		}
 		logger.Trace("Catch up latest proposal", "number", lastProposal.Number().Uint64(), "hash", lastProposal.Hash())
+		// BLS:
+		// The Proposal in c.current has to be 1 block higher than lastProposal. In hotstuff, however, c.current should
+		// replace the lastProposal.Number()-1 because of the three-phase view change protocol.
+		// /BLS
 	} else if lastProposal.Number().Cmp(big.NewInt(c.current.Height().Int64()-1)) == 0 {
 		if round.Cmp(common.Big0) == 0 {
 			// same height and round, don't need to start new round
@@ -297,7 +303,9 @@ func (c *core) startNewRound(round *big.Int) {
 	var newView *hotstuff.View
 	if roundChange {
 		newView = &hotstuff.View{
-			Height: new(big.Int).Set(c.current.Height()),
+			// TODO: Need to check if (height - 1) is right
+			// Height: new(big.Int).Set(c.current.Height()),
+			Height: new(big.Int).Sub(c.current.Height(), common.Big1),
 			Round:  new(big.Int).Set(round),
 		}
 	} else {
@@ -314,7 +322,7 @@ func (c *core) startNewRound(round *big.Int) {
 	c.roundChangeSet = newRoundChangeSet(c.valSet)
 	// New snapshot for new round
 	c.updateRoundState(newView, c.valSet, roundChange)
-	// Calculate new proposer
+	// Calculate new proposer and update the valSet
 	c.valSet.CalcSpeaker(lastSpeaker, newView.Round.Uint64())
 	c.waitingForRoundChange = false
 
@@ -326,7 +334,7 @@ func (c *core) startNewRound(round *big.Int) {
 
 	if roundChange && c.IsSpeaker() && c.current != nil && c.hasAggPub && c.state == StateAcceptRequest {
 		if c.current.pendingRequest != nil && !c.pendingRequestsUnconfirmedQueue.Empty() {
-			// TODO - hotstuff changeview replacing pendingRequest, commit directly with aggsig of roundchange
+			// Hotstuff view change replacing pendingRequest, commit directly with aggsig of roundchange
 			c.commit(true, round)
 		}
 	}
@@ -353,8 +361,19 @@ func (c *core) catchUpRound(view *hotstuff.View) {
 // updateRoundState updates round state
 func (c *core) updateRoundState(view *hotstuff.View, validatorSet hotstuff.ValidatorSet, roundChange bool) {
 	if roundChange && c.current != nil {
-		// TODO - hotstuff changeview replacing pendingRequest
-		c.current = newRoundState(view, validatorSet, nil, c.current.pendingRequest, c.backend.HasBadProposal)
+		// Hotstuff view change replacing pendingRequest
+		if !c.pendingRequestsUnconfirmedQueue.Empty() {
+			proposal, err := c.pendingRequestsUnconfirmedQueue.GetFirst()
+			if err != nil {
+				c.logger.Trace("Invalid unconfirmed queue")
+				return
+			} else {
+				r := &hotstuff.Request{
+					Proposal: proposal.(hotstuff.Proposal),
+				}
+				c.current = newRoundState(view, validatorSet, nil, r, c.backend.HasBadProposal)
+			}
+		}
 	} else {
 		c.current = newRoundState(view, validatorSet, nil, nil, c.backend.HasBadProposal)
 	}
@@ -405,8 +424,12 @@ func (c *core) addAggPub(address common.Address, pubByte []byte) (int, error) {
 	return c.backend.AddAggPub(c.valSet, address, pubByte)
 }
 
+func (c *core) countAggPub() int {
+	return c.backend.CountAggPub()
+}
+
 func (c *core) HotStuffSize() int {
-	c.logger.Trace("Confirmation Formula used (N-(N-1))/3")
+	c.logger.Trace("Confirmation Formula used N-(N-1)/3")
 	return int((c.valSet.Size() - (c.valSet.Size()-1)/3))
 }
 

@@ -14,30 +14,24 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package hotstuff
+package core
 
-// import (
-// 	"github.com/ethereum/go-ethereum/common"
-// )
+import (
+	"sync"
 
-// RequestEvent is posted to propose a proposal (posting the incoming block to
-// the main hotstuff engine anyway regardless of being the speaker or delegators)
-type RequestEvent struct {
-	Proposal Proposal
-}
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/hotstuff"
+)
 
-// MessageEvent is posted for HotStuff engine communication (posting the incoming
-// communication messages to the main hotstuff engine anyway)
-type MessageEvent struct {
-	Payload []byte
-}
-
-// SendingPubEvent is posted for HotStuff engine communication (posting the incoming
-// communication messages to the main hotstuff engine anyway to broadcast the pub)
-type SendingPubEvent struct {
-	Payload []byte
-}
-
-// FinalCommittedEvent is posted when a proposal is committed
-type FinalCommittedEvent struct {
+func newTestRoundState(view *hotstuff.View, validatorSet hotstuff.ValidatorSet) *roundState {
+	return &roundState{
+		round:     view.Round,
+		height:    view.Height,
+		Announce:  newTestAnnounce(view),
+		Responses: newMessageSet(validatorSet),
+		mu:        new(sync.RWMutex),
+		hasBadProposal: func(hash common.Hash) bool {
+			return false
+		},
+	}
 }

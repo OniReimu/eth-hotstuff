@@ -217,7 +217,7 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 
 	// BLS-Upgrade
 	if _, ok := worker.engine.(consensus.HotStuff); ok {
-		worker.unconfirmed = newUnconfirmedBlocks(eth.BlockChain(), 3)
+		worker.unconfirmed = newUnconfirmedBlocks(eth.BlockChain(), uint(params.MinimumUnconfirmed))
 	} else {
 		worker.unconfirmed = newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth)
 	}

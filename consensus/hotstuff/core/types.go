@@ -35,11 +35,9 @@ type CoreEngine interface {
 	//
 	// this is useful when the engine is currently the speaker
 	//
-	// pending request is populated right at the first pre-request stage so this would give us the earliest verification
+	// pending request is populated right at the request stage so this would give us the earliest verification
 	// to avoid any race condition of coming propagated blocks
 	IsCurrentProposal(blockHash common.Hash) bool
-
-	// SetAddressAndLogger(addr common.Address)
 
 	CurrentRoundstate() *roundState
 }

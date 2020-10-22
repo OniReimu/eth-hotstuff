@@ -26,9 +26,10 @@ import (
 
 	// "go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3"
+	"go.dedis.ch/kyber/v3/pairing/bn256"
 	"go.dedis.ch/kyber/v3/sign"
 	"go.dedis.ch/kyber/v3/sign/bdn"
-	// "go.dedis.ch/kyber/v3/util/random"
+	"go.dedis.ch/kyber/v3/util/random"
 )
 
 func (h *backend) AggPubCh() chan struct{} {
@@ -53,6 +54,11 @@ func (h *backend) AddAggPub(valSet hotstuff.ValidatorSet, address common.Address
 	}
 
 	return h.participants, nil
+}
+
+// AddAggPub implements hotstuff.Backend.AddAggPub
+func (h *backend) CountAggPub() int {
+	return h.participants
 }
 
 // AggregatedSignedFromSingle implements hotstuff.Backend.AggregatedSignedFromSingle
@@ -241,4 +247,11 @@ func (h *backend) verifyMask(valSet hotstuff.ValidatorSet, mask []byte) error {
 		return errInvalidAggregatedSig
 	}
 	return nil
+}
+
+// This can only be used for unit test for now as the pub has been broadcast, which needs a global update.
+func (h *backend) SetAggInfo(unitTest bool, suite *bn256.Suite) {
+	if unitTest {
+		h.aggregatedPrv, h.aggregatedPub = bdn.NewKeyPair(suite, random.New())
+	}
 }

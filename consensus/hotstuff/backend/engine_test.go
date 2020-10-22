@@ -19,13 +19,13 @@ package backend
 import (
 	"bytes"
 	"crypto/ecdsa"
-	// "math/big"
+	"math/big"
 	"reflect"
 	"testing"
-	// "time"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	// "github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/hotstuff"
 	"github.com/ethereum/go-ethereum/core"
@@ -39,9 +39,9 @@ import (
 	"go.dedis.ch/kyber/v3/pairing/bn256"
 )
 
-// in this test, we can set n to 1, and it means we can process Istanbul and commit a
+// in this test, we can set n to 1, and it means we can process HotStuff and commit a
 // block by one node. Otherwise, if n is larger than 1, we have to generate
-// other fake events to process Istanbul.
+// other fake events to process HotStuff.
 func newBlockChain(n int) (*core.BlockChain, *backend) {
 	config, genesis, nodeKeys := getGenesisAndKeys(n)
 	memDB := rawdb.NewMemoryDatabase()
@@ -203,5 +203,333 @@ func TestSealStopChannel(t *testing.T) {
 	finalBlock := <-resultCh
 	if finalBlock != nil {
 		t.Errorf("block mismatch: have %v, want nil", finalBlock)
+	}
+}
+
+func TestVerifyHeader(t *testing.T) {
+	chain, engine := newBlockChain(1)
+
+	// errEmptyAggregatedSig case
+	block := makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	block, _ = engine.updateBlock(chain.Genesis().Header(), block)
+	err := engine.VerifyHeader(chain, block.Header(), false)
+	if err != errEmptyAggregatedSig {
+		t.Errorf("error mismatch: have %v, want %v", err, errEmptyAggregatedSig)
+	}
+
+	// short extra data
+	header := block.Header()
+	header.Extra = []byte{}
+	err = engine.VerifyHeader(chain, header, false)
+	if err != errInvalidExtraDataFormat {
+		t.Errorf("error mismatch: have %v, want %v", err, errInvalidExtraDataFormat)
+	}
+	// incorrect extra format
+	header.Extra = []byte("0000000000000000000000000000000012300000000000000000000000000000000000000000000000000000000000000000")
+	err = engine.VerifyHeader(chain, header, false)
+	if err != errInvalidExtraDataFormat {
+		t.Errorf("error mismatch: have %v, want %v", err, errInvalidExtraDataFormat)
+	}
+
+	// non zero MixDigest
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	header = block.Header()
+	header.MixDigest = common.StringToHash("123456789")
+	err = engine.VerifyHeader(chain, header, false)
+	if err != errInvalidMixDigest {
+		t.Errorf("error mismatch: have %v, want %v", err, errInvalidMixDigest)
+	}
+
+	// invalid uncles hash
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	header = block.Header()
+	header.UncleHash = common.StringToHash("123456789")
+	err = engine.VerifyHeader(chain, header, false)
+	if err != errInvalidUncleHash {
+		t.Errorf("error mismatch: have %v, want %v", err, errInvalidUncleHash)
+	}
+
+	// invalid difficulty
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	header = block.Header()
+	header.Difficulty = big.NewInt(2)
+	err = engine.VerifyHeader(chain, header, false)
+	if err != errInvalidDifficulty {
+		t.Errorf("error mismatch: have %v, want %v", err, errInvalidDifficulty)
+	}
+
+	// invalid timestamp
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	header = block.Header()
+	header.Time = chain.Genesis().Time() + (engine.config.BlockPeriod - 1)
+	err = engine.VerifyHeader(chain, header, false)
+	if err != errInvalidTimestamp {
+		t.Errorf("error mismatch: have %v, want %v", err, errInvalidTimestamp)
+	}
+
+	// future block
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	header = block.Header()
+	header.Time = uint64(now().Unix() + 10)
+	err = engine.VerifyHeader(chain, header, false)
+	if err != consensus.ErrFutureBlock {
+		t.Errorf("error mismatch: have %v, want %v", err, consensus.ErrFutureBlock)
+	}
+
+	// invalid nonce
+	block = makeBlockWithoutSeal(chain, engine, chain.Genesis())
+	header = block.Header()
+	copy(header.Nonce[:], hexutil.MustDecode("0x111111111111"))
+	header.Number = big.NewInt(int64(engine.config.Epoch))
+	err = engine.VerifyHeader(chain, header, false)
+	if err != errInvalidNonce {
+		t.Errorf("error mismatch: have %v, want %v", err, errInvalidNonce)
+	}
+}
+
+func TestVerifySeal(t *testing.T) {
+	chain, engine := newBlockChain(1)
+	genesis := chain.Genesis()
+	// cannot verify genesis
+	err := engine.VerifySeal(chain, genesis.Header())
+	if err != errUnknownBlock {
+		t.Errorf("error mismatch: have %v, want %v", err, errUnknownBlock)
+	}
+
+	block := makeBlock(chain, engine, genesis)
+	// change block content
+	header := block.Header()
+	header.Number = big.NewInt(4)
+	block1 := block.WithSeal(header)
+	err = engine.VerifySeal(chain, block1.Header())
+	if err != errUnauthorizedSigner {
+		t.Errorf("error mismatch: have %v, want %v", err, errUnauthorizedSigner)
+	}
+
+	// unauthorized users but still can get correct signer address
+	engine.privateKey, _ = crypto.GenerateKey()
+	err = engine.VerifySeal(chain, block.Header())
+	if err != nil {
+		t.Errorf("error mismatch: have %v, want nil", err)
+	}
+}
+
+func TestVerifyHeaders(t *testing.T) {
+	chain, engine := newBlockChain(1)
+	genesis := chain.Genesis()
+
+	// success case
+	headers := []*types.Header{}
+	blocks := []*types.Block{}
+	size := 100
+
+	for i := 0; i < size; i++ {
+		var b *types.Block
+		if i == 0 {
+			b = makeBlockWithoutSeal(chain, engine, genesis)
+			b, _ = engine.updateBlock(genesis.Header(), b)
+		} else {
+			b = makeBlockWithoutSeal(chain, engine, blocks[i-1])
+			b, _ = engine.updateBlock(blocks[i-1].Header(), b)
+		}
+		blocks = append(blocks, b)
+		headers = append(headers, blocks[i].Header())
+	}
+	now = func() time.Time {
+		return time.Unix(int64(headers[size-1].Time), 0)
+	}
+	_, results := engine.VerifyHeaders(chain, headers, nil)
+	const timeoutDura = 2 * time.Second
+	timeout := time.NewTimer(timeoutDura)
+	index := 0
+OUT1:
+	for {
+		select {
+		case err := <-results:
+			if err != nil {
+				if err != errEmptyAggregatedSig && err != errInvalidAggregatedSig {
+					t.Errorf("error mismatch: have %v, want errEmptyAggregatedSig|errInvalidAggregatedSig", err)
+					break OUT1
+				}
+			}
+			index++
+			if index == size {
+				break OUT1
+			}
+		case <-timeout.C:
+			break OUT1
+		}
+	}
+	// abort cases
+	abort, results := engine.VerifyHeaders(chain, headers, nil)
+	timeout = time.NewTimer(timeoutDura)
+	index = 0
+OUT2:
+	for {
+		select {
+		case err := <-results:
+			if err != nil {
+				if err != errEmptyAggregatedSig && err != errInvalidAggregatedSig {
+					t.Errorf("error mismatch: have %v, want errEmptyAggregatedSig|errInvalidAggregatedSig", err)
+					break OUT2
+				}
+			}
+			index++
+			if index == 5 {
+				abort <- struct{}{}
+			}
+			if index >= size {
+				t.Errorf("verifyheaders should be aborted")
+				break OUT2
+			}
+		case <-timeout.C:
+			break OUT2
+		}
+	}
+	// error header cases
+	headers[2].Number = big.NewInt(100)
+	abort, results = engine.VerifyHeaders(chain, headers, nil)
+	timeout = time.NewTimer(timeoutDura)
+	index = 0
+	errors := 0
+	expectedErrors := 2
+OUT3:
+	for {
+		select {
+		case err := <-results:
+			if err != nil {
+				if err != errEmptyAggregatedSig && err != errInvalidAggregatedSig {
+					errors++
+				}
+			}
+			index++
+			if index == size {
+				if errors != expectedErrors {
+					t.Errorf("error mismatch: have %v, want %v", err, expectedErrors)
+				}
+				break OUT3
+			}
+		case <-timeout.C:
+			break OUT3
+		}
+	}
+}
+
+// TODO: Need to fill in the expectedResult.
+func TestPrepareExtra(t *testing.T) {
+	speaker := common.BytesToAddress(hexutil.MustDecode("0x44add0ec310f115a0e603b2d7db9f067778eaf8a"))
+	validators := make([]common.Address, 4)
+	validators[0] = common.BytesToAddress(hexutil.MustDecode("0x44add0ec310f115a0e603b2d7db9f067778eaf8a"))
+	validators[1] = common.BytesToAddress(hexutil.MustDecode("0x294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212"))
+	validators[2] = common.BytesToAddress(hexutil.MustDecode("0x6beaaed781d2d2ab6350f5c4566a2c6eaac407a6"))
+	validators[3] = common.BytesToAddress(hexutil.MustDecode("0x8be76812f765c24641ec63dc2852b378aba2b440"))
+
+	vanity := make([]byte, types.HotStuffExtraVanity)
+	expectedResult := append(vanity, hexutil.MustDecode("0xf858f8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b44080c0")...)
+
+	h := &types.Header{
+		Number: big.NewInt(0), // Only test the genesis
+		Extra:  vanity,
+	}
+
+	payload, err := prepareExtra(h, speaker, validators)
+	if err != nil {
+		t.Errorf("error mismatch: have %v, want: nil", err)
+	}
+	if !reflect.DeepEqual(payload, expectedResult) {
+		t.Errorf("payload mismatch: have %v, want %v", payload, expectedResult)
+	}
+
+	// append useless information to extra-data
+	h.Extra = append(vanity, make([]byte, 15)...)
+
+	payload, err = prepareExtra(h, speaker, validators)
+	if !reflect.DeepEqual(payload, expectedResult) {
+		t.Errorf("payload mismatch: have %v, want %v", payload, expectedResult)
+	}
+}
+
+// TODO: Need to fill in the hstRawData.
+func TestWriteSeal(t *testing.T) {
+	vanity := bytes.Repeat([]byte{0x00}, types.HotStuffExtraVanity)
+	hstRawData := hexutil.MustDecode("0xf858f8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b44080c0")
+	expectedSeal := bytes.Repeat([]byte{0x00}, types.HotStuffExtraSeal)
+	expectedHstExtra := &types.HotStuffExtra{
+		SpeakerAddr: common.BytesToAddress(hexutil.MustDecode("0x44add0ec310f115a0e603b2d7db9f067778eaf8a")),
+		Seal:        expectedSeal,
+	}
+	var expectedErr error
+
+	h := &types.Header{
+		Extra: append(vanity, hstRawData...),
+	}
+
+	// normal case
+	err := writeSeal(h, expectedSeal)
+	if err != expectedErr {
+		t.Errorf("error mismatch: have %v, want %v", err, expectedErr)
+	}
+
+	// verify istanbul extra-data
+	hstExtra, err := types.ExtractHotStuffExtra(h)
+	if err != nil {
+		t.Errorf("error mismatch: have %v, want nil", err)
+	}
+	if !reflect.DeepEqual(hstExtra, expectedHstExtra) {
+		t.Errorf("extra data mismatch: have %v, want %v", hstExtra, expectedHstExtra)
+	}
+
+	// invalid seal
+	unexpectedSeal := append(expectedSeal, make([]byte, 1)...)
+	err = writeSeal(h, unexpectedSeal)
+	if err != errInvalidSignature {
+		t.Errorf("error mismatch: have %v, want %v", err, errInvalidSignature)
+	}
+}
+
+// TODO: Need to fill in the hstRawData.
+// TODO: Need to verify the format of AggSig? The size of AggSig doesn't seem to be fixed though --saber
+func TestWriteAggregatedSig(t *testing.T) {
+	vanity := bytes.Repeat([]byte{0x00}, types.HotStuffExtraVanity)
+	hstRawData := hexutil.MustDecode("0xf858f8549444add0ec310f115a0e603b2d7db9f067778eaf8a94294fc7e8f22b3bcdcf955dd7ff3ba2ed833f8212946beaaed781d2d2ab6350f5c4566a2c6eaac407a6948be76812f765c24641ec63dc2852b378aba2b44080c0")
+
+	expectedMask := bytes.Repeat([]byte{0x00}, types.HotStuffExtraSeal)
+	expectedAggregatedKey := bytes.Repeat([]byte{0x00}, types.HotStuffExtraSeal)
+	expectedAggregatedSig := bytes.Repeat([]byte{0x00}, types.HotStuffExtraSeal)
+
+	expectedHstExtra := &types.HotStuffExtra{
+		SpeakerAddr:   common.BytesToAddress(hexutil.MustDecode("0x44add0ec310f115a0e603b2d7db9f067778eaf8a")),
+		Mask:          expectedMask,
+		AggregatedKey: expectedAggregatedKey,
+		AggregatedSig: expectedAggregatedSig,
+		Seal:          []byte{},
+	}
+	var expectedErr error
+
+	h := &types.Header{
+		Extra: append(vanity, hstRawData...),
+	}
+
+	// normal case
+	hotStuffExtra, err := types.ExtractHotStuffExtra(h)
+	if err != expectedErr {
+		t.Errorf("error mismatch: have %v, want %v", err, expectedErr)
+	}
+	copy(hotStuffExtra.Mask, expectedMask)
+	copy(hotStuffExtra.AggregatedKey, expectedAggregatedKey)
+	copy(hotStuffExtra.AggregatedSig, expectedAggregatedSig)
+
+	_, err = rlp.EncodeToBytes(&hotStuffExtra)
+	if err != expectedErr {
+		t.Errorf("error mismatch: have %v, want %v", err, expectedErr)
+	}
+
+	// verify hotstuff extra-data
+	hstExtra, err := types.ExtractHotStuffExtra(h)
+	if err != nil {
+		t.Errorf("error mismatch: have %v, want nil", err)
+	}
+	if !reflect.DeepEqual(hstExtra, expectedHstExtra) {
+		t.Errorf("extra data mismatch: have %v, want %v", hstExtra, expectedHstExtra)
 	}
 }

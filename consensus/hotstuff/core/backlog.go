@@ -40,8 +40,17 @@ func (c *core) checkMessage(msgCode uint64, view *hotstuff.View) error {
 		return errInvalidMessage
 	}
 
+	if !c.hasAggPub && msgCode > msgSendPub {
+		return errInsufficientPub
+	}
+
 	if msgCode == msgRoundChange {
-		if view.Height.Cmp(c.currentView().Height) > 0 {
+		// Three-phase view change -> reorg
+		if view.Height.Uint64()+1 == c.currentView().Height.Uint64() && view.Round.Uint64() > 0 {
+			return nil
+		}
+		// other cases
+		if view.Height.Cmp(c.currentView().Height) >= 0 { // Round change in hotstuff should only propose the (current-1) block
 			return errFutureMessage
 		} else if view.Cmp(c.currentView()) < 0 {
 			return errOldMessage
@@ -70,7 +79,7 @@ func (c *core) checkMessage(msgCode uint64, view *hotstuff.View) error {
 		return nil
 	}
 
-	// For states(StateAnnounce, StateResponse, StateCommitted),
+	// For states(StateAnnounce, StateResponsed, StateCommitted),
 	// can accept all message types if processing with same view
 	return nil
 }
@@ -178,10 +187,10 @@ func (c *core) processBacklog() {
 
 func toPriority(msgCode uint64, view *hotstuff.View) float32 {
 	if msgCode == msgRoundChange {
-		// For msgRoundChange, set the message priority based on its sequence
+		// For msgRoundChange, set the message priority based on its height
 		return -float32(view.Height.Uint64() * 1000)
 	}
-	// FIXME: round will be reset as 0 while new sequence
+	// FIXME: round will be reset as 0 while new height
 	// 10 * Round limits the range of message code is from 0 to 9
 	// 1000 * Height limits the range of round is from 0 to 99
 	return -float32(view.Height.Uint64()*1000 + view.Round.Uint64()*10 + uint64(msgPriority[msgCode]))

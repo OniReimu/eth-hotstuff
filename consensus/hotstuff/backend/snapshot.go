@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/hotstuff/validator"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/params"
 	lru "github.com/hashicorp/golang-lru"
 )
 
@@ -256,19 +257,17 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 		if len(snap.Processing) > 0 {
 			for address, _ := range snap.Processing {
 				snap.Processing[address] += 1
-
-				if snap.Processing[address] > 3 {
+				// TODO: Need to check if this should be a pure >
+				if snap.Processing[address] >= params.MinimumUnconfirmed {
 					tally := snap.Tally[address]
 					if tally.Authorize {
 						snap.ValSet.AddValidator(address)
 					} else {
 						snap.ValSet.RemoveValidator(address)
-
 					}
 					delete(snap.Tally, address)
 					delete(snap.Processing, address)
 				}
-
 			}
 		}
 
@@ -278,8 +277,10 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 				snap.Processing[header.Coinbase] += 1
 			}
 			if tally.Authorize {
+				// // 3-accumulation is needed for hotstuff
 				// snap.ValSet.AddValidator(header.Coinbase)
 			} else {
+				// // 3-accumulation is needed for hotstuff
 				// snap.ValSet.RemoveValidator(header.Coinbase)
 
 				// Signer list shrunk, delete any leftover recent caches

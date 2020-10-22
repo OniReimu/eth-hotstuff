@@ -43,8 +43,10 @@ func (c *core) sendRoundChange(round *big.Int) {
 	// Reset ROUND CHANGE timeout timer with new round number
 	c.catchUpRound(&hotstuff.View{
 		// The round number we'd like to transfer to.
-		Round:  new(big.Int).Set(round),
-		Height: new(big.Int).Set(cv.Height),
+		Round: new(big.Int).Set(round),
+		// TODO: Need to check if (height - 1) is right
+		// Height: new(big.Int).Set(cv.Height),
+		Height: new(big.Int).Sub(cv.Height, common.Big1),
 	})
 
 	// Now we have the new round number and block height number
